@@ -1,8 +1,8 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FotoPuente · Fotografías privadas</title>
 <style>:root{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:#f3f6fb;color:#17243b}*{box-sizing:border-box}body{margin:0}header{background:linear-gradient(115deg,#163d8d,#2563eb);color:white;padding:25px max(16px,calc((100% - 920px)/2))}header h1{margin:0;font-size:28px}header p{margin:4px 0 0;opacity:.85}main{max-width:920px;margin:22px auto;padding:0 14px}.card{background:white;padding:22px;border-radius:16px;box-shadow:0 5px 25px #12315a13;margin-bottom:18px}.hidden{display:none!important}input,button{font:inherit;width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;margin:7px 0}button{background:#205bd8;color:white;border:0;cursor:pointer;font-weight:650}button:disabled{opacity:.5;cursor:wait}.secondary{background:#52657e}.danger{background:#b42336}.muted{color:#64748b}.small{font-size:13px}.notice{background:#edf5ff;border-radius:10px;padding:12px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.photo{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #e2e8f0;flex-wrap:wrap}.photo .name{flex:2;min-width:180px;overflow-wrap:anywhere}.photo button{width:auto;min-width:95px}.status{white-space:pre-wrap;overflow-wrap:anywhere}.worker{border-bottom:1px solid #e2e8f0;padding:10px 0}.worker button{max-width:180px}h2{margin-top:0}@media(max-width:500px){.photo button{flex:1}}</style></head>
 <body><header><h1>📸 FotoPuente</h1><p>Transfiere fotografías de forma privada entre celular y computadora</p></header><main>
-<section class="card" id="loginPanel"><h2>Iniciar sesión</h2><input id="email" type="email" placeholder="Correo electrónico" autocomplete="username"><input id="password" type="password" placeholder="Contraseña" autocomplete="current-password"><button id="loginBtn">Entrar</button><p id="loginStatus" class="status muted" role="status"></p></section>
-<section class="card hidden" id="invitePanel"><h2>Establece tu contraseña</h2><p class="muted">Has abierto una invitación de FotoPuente. Crea una contraseña nueva que solo tú conozcas.</p><input id="invitePassword" type="password" placeholder="Contraseña nueva (mínimo 12 caracteres)" autocomplete="new-password"><input id="invitePasswordConfirm" type="password" placeholder="Repite la contraseña" autocomplete="new-password"><button id="setInvitePassword">Guardar contraseña y entrar</button><p id="inviteStatus" class="status muted" role="status"></p></section>
+<section class="card" id="loginPanel"><h2>Iniciar sesión</h2><input id="email" type="email" placeholder="Correo electrónico" autocomplete="username"><input id="password" type="password" placeholder="Contraseña" autocomplete="current-password"><button id="loginBtn">Entrar</button><button id="forgotPassword" type="button" class="secondary">Crear o recuperar contraseña por correo</button><p id="loginStatus" class="status muted" role="status"></p></section>
+<section class="card hidden" id="invitePanel"><h2>Establece tu contraseña</h2><p class="muted">Has abierto un enlace seguro de invitación o recuperación. Crea una contraseña nueva que solo tú conozcas.</p><input id="invitePassword" type="password" placeholder="Contraseña nueva (mínimo 12 caracteres)" autocomplete="new-password"><input id="invitePasswordConfirm" type="password" placeholder="Repite la contraseña" autocomplete="new-password"><button id="setInvitePassword">Guardar contraseña y entrar</button><p id="inviteStatus" class="status muted" role="status"></p></section>
 <section id="dashboard" class="hidden"><section class="card"><div class="row"><div><h2>Mis fotografías</h2><p class="muted" id="identity"></p></div><button id="logout" class="secondary">Cerrar sesión</button></div><p class="notice">Solo tu cuenta puede ver, descargar y eliminar sus fotografías. Las descargas usan enlaces temporales.</p><label for="files"><b>Seleccionar de galería</b></label><input id="files" type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple><label for="camera"><b>Tomar fotografía con la cámara</b></label><input id="camera" type="file" accept="image/*" capture="environment"><div id="previewBox" class="hidden"><p><b>Revisa tu fotografía antes de subirla:</b></p><img id="cameraPreview" alt="Vista previa de la fotografía" style="display:block;max-width:100%;max-height:340px;border-radius:10px;object-fit:contain"><button id="retake" type="button" class="secondary">Volver a tomar fotografía</button></div><button id="uploadBtn">Subir fotografías</button><p class="small muted">Máximo 15 MB por imagen · cuota de 500 MB por trabajador</p><p id="uploadStatus" class="status" role="status"></p><button id="refresh" class="secondary">Actualizar lista</button><div id="photoList"></div></section>
 <section class="card hidden" id="adminPanel"><h2>Panel management</h2><p class="muted">Gestiona cuentas y estadísticas. No permite abrir fotografías ajenas.</p><button id="refreshAdmin" class="secondary">Actualizar administración</button><p id="adminStats" class="status"></p><h3>Invitar trabajador</h3><input id="newEmail" type="email" placeholder="Correo del trabajador"><button id="createWorker">Enviar invitación por correo</button><p id="adminStatus" class="status" role="status"></p><h3>Trabajadores</h3><div id="workerList"></div><h3>Actividad reciente</h3><div id="activity" class="small muted"></div></section></section>
 </main>
@@ -12,8 +12,8 @@ const $=id=>document.getElementById(id), show=(id,yes)=>$(id).classList.toggle('
 const message=(id,s)=>$(id).textContent=s;
 let db=null,currentUser=null,isAdmin=false;
 // Guardar la intención antes de que supabase-js procese el enlace y limpie el fragmento.
-const inviteInUrl = new URLSearchParams(location.hash.slice(1)).get('type') === 'invite'
-  || new URLSearchParams(location.search).get('type') === 'invite';
+const linkType = new URLSearchParams(location.hash.slice(1)).get('type') || new URLSearchParams(location.search).get('type');
+const inviteInUrl = linkType === 'invite' || linkType === 'recovery';
 if(inviteInUrl) sessionStorage.setItem('fp_invite_pending','1');
 const invitePending=()=>sessionStorage.getItem('fp_invite_pending')==='1';
 function showInvite(){show('loginPanel',false);show('dashboard',false);show('invitePanel',true)}
@@ -22,17 +22,20 @@ const SUPABASE_URL = 'https://juqoetvaualacwqqbrwv.supabase.co';
 const SUPABASE_PUBLIC_KEY = 'sb_publishable_4EmJWIocy6HE6xvsdAm9gA_inodI4ky';
 const saved=()=>({url:SUPABASE_URL,key:SUPABASE_PUBLIC_KEY});
 function connect(url,key){
-  if(key==='PEGA_AQUI_TU_CLAVE_SB_PUBLISHABLE'){
+  if(key==='sb_publishable_4EmJWIocy6HE6xvsdAm9gA_inodI4ky'){
     message('loginStatus','Configuración pendiente: agrega la clave pública de Supabase en index.html.');
     $('loginBtn').disabled=true;
     return;
   }
   try{
     db=createClient(url,key,{auth:{persistSession:true,autoRefreshToken:true}});
+    db.auth.onAuthStateChange((event,session)=>{
+      if(event==='PASSWORD_RECOVERY' && session){sessionStorage.setItem('fp_invite_pending','1');showInvite();}
+    });
     db.auth.getSession().then(({data,error})=>{
       if(error) message('loginStatus',error.message);
       if(data.session){if(invitePending())showInvite();else loadDashboard();}
-      else if(invitePending())message('loginStatus','Abre el enlace de invitación más reciente desde tu correo.');
+      else if(invitePending())message('loginStatus','Abre el enlace de invitación o recuperación más reciente desde tu correo.');
     });
   }catch(e){message('loginStatus',e.message)}
 }
@@ -43,7 +46,7 @@ $('setInvitePassword').onclick=async()=>{
   $('setInvitePassword').disabled=true;
   try{
     const {data:{session}}=await db.auth.getSession();
-    if(!session)throw Error('La invitación caducó o no se pudo validar. Solicita una nueva.');
+    if(!session)throw Error('El enlace caducó o no se pudo validar. Solicita uno nuevo.');
     const {error}=await db.auth.updateUser({password:pass});
     if(error)throw error;
     sessionStorage.removeItem('fp_invite_pending');
@@ -52,6 +55,16 @@ $('setInvitePassword').onclick=async()=>{
     await loadDashboard();
   }catch(e){message('inviteStatus',e.message)}
   finally{$('setInvitePassword').disabled=false;}
+};
+$('forgotPassword').onclick=async()=>{
+  const email=$('email').value.trim();
+  if(!email)return message('loginStatus','Escribe primero tu correo electrónico.');
+  $('forgotPassword').disabled=true;
+  try{const {error}=await db.auth.resetPasswordForEmail(email,{redirectTo:'https://lyca99-01.github.io/FOTO-puente/'});
+    if(error)throw error;
+    message('loginStatus','Si el correo corresponde a una cuenta registrada y el servicio de correo está disponible, recibirás un enlace para crear una contraseña. Revisa también spam.');
+  }catch(e){message('loginStatus','No se pudo solicitar el enlace: '+e.message)}
+  finally{$('forgotPassword').disabled=false;}
 };
 $('loginBtn').onclick=async()=>{message('loginStatus','Verificando…');const {error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error)return message('loginStatus',error.message);$('password').value='';await loadDashboard()};
 $('logout').onclick=async()=>{await db.auth.signOut();currentUser=null;show('dashboard',false);show('invitePanel',false);show('loginPanel',true)};
