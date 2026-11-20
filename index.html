@@ -22,7 +22,7 @@ const SUPABASE_URL = 'https://juqoetvaualacwqqbrwv.supabase.co';
 const SUPABASE_PUBLIC_KEY = 'sb_publishable_4EmJWIocy6HE6xvsdAm9gA_inodI4ky';
 const saved=()=>({url:SUPABASE_URL,key:SUPABASE_PUBLIC_KEY});
 function connect(url,key){
- if(!key || key==='PEGA_AQUI_TU_CLAVE_SB_PUBLISHABLE'){
+  if(!key || key==='PEGA_AQUI_TU_CLAVE_SB_PUBLISHABLE'){
     message('loginStatus','Configuración pendiente: agrega la clave pública de Supabase en index.html.');
     $('loginBtn').disabled=true;
     return;
