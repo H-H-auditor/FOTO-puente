@@ -3,7 +3,7 @@
 <body><header><h1>📸 FotoPuente</h1><p>Transfiere fotografías de forma privada entre celular y computadora</p></header><main>
 <section class="card" id="loginPanel"><h2>Iniciar sesión</h2><input id="email" type="email" placeholder="Correo electrónico" autocomplete="username"><input id="password" type="password" placeholder="Contraseña" autocomplete="current-password"><button id="loginBtn">Entrar</button><button id="forgotPassword" type="button" class="secondary">Crear o recuperar contraseña por correo</button><p id="loginStatus" class="status muted" role="status"></p></section>
 <section class="card hidden" id="invitePanel"><h2>Establece tu contraseña</h2><p class="muted">Has abierto un enlace seguro de invitación o recuperación. Crea una contraseña nueva que solo tú conozcas.</p><input id="invitePassword" type="password" placeholder="Contraseña nueva (mínimo 6 caracteres)" autocomplete="new-password"><input id="invitePasswordConfirm" type="password" placeholder="Repite la contraseña" autocomplete="new-password"><button id="setInvitePassword">Guardar contraseña y entrar</button><p id="inviteStatus" class="status muted" role="status"></p></section>
-<section id="dashboard" class="hidden"><section class="card"><div class="row"><div><h2>Mis fotografías</h2><p class="muted" id="identity"></p></div><button id="logout" class="secondary">Cerrar sesión</button></div><p class="notice">Solo tu cuenta puede ver, descargar y eliminar sus fotografías. Las descargas usan enlaces temporales.</p><label for="files"><b>Seleccionar de galería</b></label><input id="files" type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple><label for="camera"><b>Tomar fotografía con la cámara</b></label><input id="camera" type="file" accept="image/*" capture="environment"><div id="previewBox" class="hidden"><p><b>Revisa tu fotografía antes de subirla:</b></p><img id="cameraPreview" alt="Vista previa de la fotografía" style="display:block;max-width:100%;max-height:340px;border-radius:10px;object-fit:contain"><button id="retake" type="button" class="secondary">Volver a tomar fotografía</button></div><button id="uploadBtn">Subir fotografías</button><p class="small muted">Máximo 15 MB por imagen · cuota de 500 MB por trabajador</p><p id="uploadStatus" class="status" role="status"></p><button id="refresh" class="secondary">Actualizar lista</button><div id="photoList"></div></section>
+<section id="dashboard" class="hidden"><section class="card"><div class="row"><div><h2>Mis fotografías</h2><p class="muted" id="identity"></p></div><button id="logout" class="secondary">Cerrar sesión</button></div><p class="notice">Solo tu cuenta puede ver, descargar y eliminar sus fotografías. Las descargas usan enlaces temporales.</p><label for="files"><b>Seleccionar de galería</b></label><input id="files" type="file" accept="image/jpeg,image/png,image/webp,image/heic" multiple><label for="camera"><b>Tomar fotografía con la cámara</b></label><input id="camera" type="file" accept="image/*" capture="environment"><div id="previewBox" class="hidden"><p><b>Revisa tu fotografía antes de subirla:</b></p><img id="cameraPreview" alt="Vista previa de la fotografía" style="display:block;max-width:100%;max-height:340px;border-radius:10px;object-fit:contain"><button id="retake" type="button" class="secondary">Volver a tomar fotografía</button></div><button id="uploadBtn">Subir fotografías</button><p class="small muted">Máximo 15 MB por imagen · cuota de 500 MB por trabajador</p><p id="uploadStatus" class="status" role="status"></p><button id="refresh" class="secondary">Actualizar lista</button><div class="notice" style="margin:12px 0"><label for="dayFilter"><b>Fotografías por fecha de subida</b></label><select id="dayFilter" aria-label="Filtrar fotografías por fecha" style="background:white"><option value="all">Todas las fechas</option></select><p id="daySummary" class="small muted" role="status"></p><button id="downloadDay" type="button" class="secondary hidden">Descargar día seleccionado (.zip)</button><p id="downloadDayStatus" class="small status" role="status"></p></div><div id="photoList"></div></section>
 <section class="card hidden" id="adminPanel"><h2>Panel management</h2><p class="muted">Gestiona cuentas y estadísticas. No permite abrir fotografías ajenas.</p><button id="refreshAdmin" class="secondary">Actualizar administración</button><p id="adminStats" class="status"></p><h3>Invitar trabajador</h3><input id="newEmail" type="email" placeholder="Correo del trabajador"><button id="createWorker">Enviar invitación por correo</button><p id="adminStatus" class="status" role="status"></p><h3>Trabajadores</h3><div id="workerList"></div><h3>Actividad reciente</h3><div id="activity" class="small muted"></div></section></section>
 </main>
 <script type="module">
@@ -70,7 +70,78 @@ $('loginBtn').onclick=async()=>{message('loginStatus','Verificando…');const {e
 $('logout').onclick=async()=>{await db.auth.signOut();currentUser=null;show('dashboard',false);show('invitePanel',false);show('loginPanel',true)};
 async function loadDashboard(){const {data:{user},error}=await db.auth.getUser();if(error||!user){show('loginPanel',true);show('dashboard',false);return}currentUser=user;const {data:role,error:roleError}=await db.from('user_roles').select('role').eq('user_id',user.id).maybeSingle();if(roleError||!role){await db.auth.signOut();message('loginStatus','Cuenta sin acceso activo. Contacta a management.');show('loginPanel',true);show('dashboard',false);return}isAdmin=role.role==='admin';show('loginPanel',false);show('dashboard',true);show('adminPanel',isAdmin);message('identity',user.email+(isAdmin?' · Administrador':' · Trabajador'));await loadPhotos();if(isAdmin)await loadAdmin()}
 const fmt=n=>n<1024?n+' B':n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(1)+' MB';
-async function loadPhotos(){const {data,error}=await db.from('photos').select('id,object_path,original_name,size_bytes,created_at').order('created_at',{ascending:false});const host=$('photoList');host.replaceChildren();if(error){host.textContent='Error: '+error.message;return}if(!data.length){host.textContent='Todavía no tienes fotografías.';return}for(const p of data){const line=document.createElement('div');line.className='photo';const label=document.createElement('div');label.className='name';label.textContent=p.original_name+' · '+fmt(p.size_bytes)+' · '+new Date(p.created_at).toLocaleString('es-MX');const down=document.createElement('button');down.className='secondary';down.textContent='Descargar';down.onclick=async()=>{down.disabled=true;down.textContent='Descargando…';try{const {data:blob,error:e}=await db.storage.from('photos').download(p.object_path);if(e)throw e;const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=p.original_name||'fotografia';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){alert('No se pudo descargar: '+e.message)}finally{down.disabled=false;down.textContent='Descargar'}};const del=document.createElement('button');del.className='danger';del.textContent='Eliminar';del.onclick=async()=>{if(!confirm('¿Eliminar definitivamente '+p.original_name+'?'))return;del.disabled=true;const {error:e}=await db.storage.from('photos').remove([p.object_path]);if(e){alert('Error al borrar el archivo: '+e.message);del.disabled=false;return}const {error:dbError}=await db.from('photos').delete().eq('id',p.id);if(dbError)alert('Archivo eliminado, pero el registro requiere revisión: '+dbError.message);await loadPhotos()};line.append(label,down,del);host.append(line)}}
+// Las fechas se muestran según la zona horaria de Ciudad de México.
+const PHOTO_TIMEZONE='America/Mexico_City';
+const dateKey=iso=>new Intl.DateTimeFormat('en-CA',{timeZone:PHOTO_TIMEZONE,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(iso));
+const dateLabel=key=>new Intl.DateTimeFormat('es-MX',{timeZone:'UTC',dateStyle:'full'}).format(new Date(key+'T12:00:00Z'));
+let allPhotos=[];
+function renderPhotos(){
+  const filter=$('dayFilter').value;
+  const selected=filter==='all'?allPhotos:allPhotos.filter(p=>dateKey(p.created_at)===filter);
+  const host=$('photoList');host.replaceChildren();
+  message('daySummary',filter==='all'?`${allPhotos.length} fotografía(s) en total · ${new Set(allPhotos.map(p=>dateKey(p.created_at))).size} día(s)`:`${selected.length} fotografía(s) del ${dateLabel(filter)}`);
+  show('downloadDay',filter!=='all' && selected.length>0);
+  if(!selected.length){host.textContent='No hay fotografías para esta fecha.';return;}
+  let lastDay='';
+  for(const p of selected){
+    const day=dateKey(p.created_at);
+    if(day!==lastDay){const h=document.createElement('h3');h.textContent=dateLabel(day);h.style.margin='22px 0 4px';host.append(h);lastDay=day;}
+    const line=document.createElement('div');line.className='photo';
+    const label=document.createElement('div');label.className='name';
+    label.textContent=p.original_name+' · '+fmt(p.size_bytes)+' · '+new Date(p.created_at).toLocaleTimeString('es-MX',{timeZone:PHOTO_TIMEZONE,hour:'2-digit',minute:'2-digit'});
+    const down=document.createElement('button');down.className='secondary';down.textContent='Descargar';
+    down.onclick=async()=>{down.disabled=true;down.textContent='Descargando…';try{const {data:blob,error:e}=await db.storage.from('photos').download(p.object_path);if(e)throw e;const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=p.original_name||'fotografia';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000)}catch(e){alert('No se pudo descargar: '+e.message)}finally{down.disabled=false;down.textContent='Descargar'}};
+    const del=document.createElement('button');del.className='danger';del.textContent='Eliminar';
+    del.onclick=async()=>{if(!confirm('¿Eliminar definitivamente '+p.original_name+'?'))return;del.disabled=true;const {error:e}=await db.storage.from('photos').remove([p.object_path]);if(e){alert('Error al borrar el archivo: '+e.message);del.disabled=false;return}const {error:dbError}=await db.from('photos').delete().eq('id',p.id);if(dbError)alert('Archivo eliminado, pero el registro requiere revisión: '+dbError.message);await loadPhotos()};
+    line.append(label,down,del);host.append(line);
+  }
+}
+async function loadPhotos(){
+  // Paginar para no perder fotografías si una cuenta supera 1000 registros.
+  const photos=[];const batchSize=500;
+  for(let offset=0;;offset+=batchSize){
+    const {data,error}=await db.from('photos').select('id,object_path,original_name,size_bytes,created_at').order('created_at',{ascending:false}).range(offset,offset+batchSize-1);
+    if(error){message('daySummary','Error al consultar fotografías: '+error.message);return;}
+    photos.push(...data);if(data.length<batchSize)break;
+  }
+  allPhotos=photos;
+  const filter=$('dayFilter'),previous=filter.value;
+  filter.replaceChildren();
+  const all=document.createElement('option');all.value='all';all.textContent='Todas las fechas';filter.append(all);
+  for(const day of [...new Set(photos.map(p=>dateKey(p.created_at)))].sort().reverse()){
+    const opt=document.createElement('option');opt.value=day;opt.textContent=dateLabel(day)+' ('+photos.filter(p=>dateKey(p.created_at)===day).length+')';filter.append(opt);
+  }
+  filter.value=[...filter.options].some(o=>o.value===previous)?previous:'all';
+  renderPhotos();
+}
+$('dayFilter').onchange=()=>{message('downloadDayStatus','');renderPhotos()};
+$('downloadDay').onclick=async()=>{
+  const day=$('dayFilter').value;
+  if(day==='all')return;
+  const photos=allPhotos.filter(p=>dateKey(p.created_at)===day);
+  if(!photos.length)return;
+  const btn=$('downloadDay');btn.disabled=true;
+  message('downloadDayStatus','Preparando ZIP de '+photos.length+' fotografía(s)…');
+  try{
+    const {default:JSZip}=await import('https://esm.sh/jszip@3.10.1');
+    const zip=new JSZip();const names=new Set();
+    for(let i=0;i<photos.length;i++){
+      const p=photos[i];message('downloadDayStatus',`Descargando ${i+1} de ${photos.length}…`);
+      const {data,error}=await db.storage.from('photos').download(p.object_path);
+      if(error)throw Error(p.original_name+': '+error.message);
+      let name=(p.original_name||'fotografia').replace(/[\\/\x00-\x1f]/g,'_');
+      if(!name)name='fotografia';
+      if(names.has(name)){const dot=name.lastIndexOf('.');name=(dot>0?name.slice(0,dot):name)+'_'+(i+1)+(dot>0?name.slice(dot):'');}
+      names.add(name);zip.file(name,data);
+    }
+    message('downloadDayStatus','Comprimiendo fotografías…');
+    const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:3}});
+    const url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='FotoPuente_'+day+'.zip';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+    message('downloadDayStatus','Descarga preparada: '+photos.length+' fotografía(s).');
+  }catch(e){message('downloadDayStatus','No se pudo descargar el día: '+e.message)}
+  finally{btn.disabled=false;}
+};
 $('refresh').onclick=loadPhotos;
 let previewUrl=null;
 $('camera').addEventListener('change',()=>{
